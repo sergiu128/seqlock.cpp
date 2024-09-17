@@ -1,0 +1,9 @@
+---
+Language: Cpp
+BasedOnStyle: Google
+ColumnLimit: 120
+IndentWidth: 4
+SortIncludes: true
+Standard: c++20
+FixNamespaceComments: true
+---

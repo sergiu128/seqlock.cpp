@@ -1,0 +1,12 @@
+build/
+build-rel/
+build_rel/
+build-debug/
+build_debug/
+build_dbg/
+build-dbg/
+.cache/
+compile_commands.json
+deps_install/
+deps_build/
+clang_format_files

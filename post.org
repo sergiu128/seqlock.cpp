@@ -1,0 +1,53 @@
+#+TITLE: Seqlock From the Ground Up
+#+DATE: <2024-09-17 Tue>
+#+AUTHOR: Sergiu Marin
+
+Often times in trading systems there is a specific set of process that maintain
+some sort of snapshot of data, for example a price-level book. Multiple
+downstream processes on the same machine make use of this data to conduct their
+business. Thus a question arises: how do we ensure that any of the downstream
+processes that read the data (readers) do not impede the processes maintaining
+the data (writers)?
+
+More formally, we need a data structure with the following properties:
+- Data can be shared by multiple writers to multiple readers.
+- At any time, a writer is never starved by a reader. That is, the writer is
+  lock and wait-free with respect to any reader. Note that this implies that a
+  reader need not read every update of the data.
+- Performance does not degrade with the number of readers and/or their growth
+  rate.
+
+So we need a [[https://en.wikipedia.org/wiki/Seqlock][Sequence Lock]]. We'll first focus on the *sequence* part, which
+makes a good single-writer multiple-reader data structure with the above
+properties. The *lock* part then adds support for multiple writers. All the code
+is in C++ with support for /x86_64/ and /aarch64/ systems.
+
+* The Sequence
+
+The *sequence* accompanies the data. It's a single integer maintained by the
+writer that tells readers when the shared data is valid. Its initial value
+is 0. It is incremented by 1 by the writer *before* and *after* the shared data
+is touched. Therefore, a reader knows the shared data is valid iff:
+- The *sequence* is even before it starts reading the data.
+- The *sequence* has the same value after the data is read.
+
+The code looks like this:
+#+BEGIN_SRC cpp
+  #include <atomic>
+  #include <cstdint>
+  #include <cstring>
+
+  std::atomic<int64_t> sequence = 0;
+  char* data = new char[4096];
+  memset(data, 0, 4096);
+
+  void write(char* src) {
+      sequence.load(std::memory_order_relaxed);
+      memcpy(data, src, 4096);
+      sequence++;
+  }
+
+  void read(char *dst) {
+      int64_t seq = 
+  }
+#+END_SRC
