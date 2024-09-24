@@ -64,7 +64,8 @@ echo "
 Build complete
 "
 
-echo "
+if [[ -z ${USE_NIX} ]]; then
+    echo "
 Persist the following in your current shell (or use direnv with the ./.envrc):
 
     export CXX=$(which clang++)
@@ -75,3 +76,4 @@ Persist the following in your current shell (or use direnv with the ./.envrc):
 Run the tests: ./build/src/test
 
 Bye :)"
+fi
