@@ -13,12 +13,12 @@ using seqlock::SeqLock;
 constexpr size_t kBufferSize = 1024;
 
 TEST(SeqLock, SingleThread) {
-    auto seq = SeqLock::SeqT{0};
+    SeqLock lock{};
     char buf[kBufferSize];
     memset(buf, 0, kBufferSize);
 
-    SeqLock::StoreSingle(seq, [&] { memset(buf, 1, kBufferSize); });
-    SeqLock::TryLoad(seq, [&] {
+    lock.StoreSingle([&] { memset(buf, 1, kBufferSize); });
+    lock.TryLoad([&] {
         for (size_t i = 0; i < kBufferSize; i++) {
             ASSERT_EQ(buf[i], 1);
         }
@@ -28,7 +28,7 @@ TEST(SeqLock, SingleThread) {
 class Reader {
    public:
     Reader() = delete;
-    explicit Reader(const SeqLock::SeqT& seq, char* buf, size_t id) : seq_{seq}, buf_{buf}, id_{id} {}
+    explicit Reader(const SeqLock& lock, char* buf, size_t id) : lock_{lock}, buf_{buf}, id_{id} {}
     ~Reader() = default;
 
     Reader(const Reader&) = delete;
@@ -45,7 +45,7 @@ class Reader {
         int successful = 0;
         int failed = 0;
         while (successful < 100) {
-            bool success = SeqLock::TryLoad(seq_, [&] { memcpy(last_, buf_, kBufferSize); });
+            bool success = lock_.TryLoad([&] { memcpy(last_, buf_, kBufferSize); });
             if (success) {
                 for (size_t i = 0; i < kBufferSize - 1; i++) {
                     ASSERT_EQ(last_[i], last_[i + 1]);
@@ -62,7 +62,7 @@ class Reader {
     }
 
    private:
-    const SeqLock::SeqT& seq_;
+    const SeqLock& lock_;
     char* buf_;
     size_t id_;
 
@@ -73,7 +73,7 @@ class Reader {
 class Writer {
    public:
     Writer() = delete;
-    explicit Writer(SeqLock::SeqT& seq, char* buf) : seq_{seq}, buf_{buf} {}
+    explicit Writer(SeqLock& lock, char* buf) : lock_{lock}, buf_{buf} {}
     ~Writer() = default;
 
     Writer(const Writer&) = delete;
@@ -86,7 +86,7 @@ class Writer {
         std::cout << "writer starting" << std::endl;
 
         for (int i = 0; i < 1'000'000; i++) {
-            SeqLock::StoreSingle(seq_, [&] {
+            lock_.StoreSingle([&] {
                 memcpy(last_, buf_, kBufferSize);
                 memset(buf_, (last_[0] + 1) & 255, kBufferSize);
             });
@@ -96,21 +96,22 @@ class Writer {
     }
 
    private:
-    SeqLock::SeqT& seq_;
+    SeqLock& lock_;
     char* buf_;
 
     char last_[kBufferSize];
 };
 
 TEST(SeqLock, MultiThreadSingleWriterSingleReader) {
-    SeqLock::SeqT seq{0};
+    SeqLock lock{};
+
     char buf[kBufferSize];
     memset(buf, 0, kBufferSize);
 
-    Reader r{seq, buf, 0};
+    Reader r{lock, buf, 0};
     std::thread rt{&Reader::Run, &r};
 
-    Writer w{seq, buf};
+    Writer w{lock, buf};
     std::thread wt{&Writer::Run, &w};
 
     rt.join();
@@ -118,7 +119,8 @@ TEST(SeqLock, MultiThreadSingleWriterSingleReader) {
 }
 
 TEST(SeqLock, MultiThreadSingleWriterMultiReader) {
-    SeqLock::SeqT seq{0};
+    SeqLock lock{};
+
     char buf[kBufferSize];
     memset(buf, 0, kBufferSize);
 
@@ -127,11 +129,11 @@ TEST(SeqLock, MultiThreadSingleWriterMultiReader) {
     readers.reserve(10);
     reader_threads.reserve(10);
     for (size_t i = 0; i < 10; i++) {
-        readers.emplace_back(seq, buf, i);
+        readers.emplace_back(lock, buf, i);
         reader_threads.emplace_back(&Reader::Run, &readers.back());
     }
 
-    Writer w{seq, buf};
+    Writer w{lock, buf};
     std::thread wt{&Writer::Run, &w};
 
     for (auto& rt : reader_threads) {

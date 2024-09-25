@@ -7,11 +7,6 @@
 
 using seqlock::SeqLock;
 
-SeqLock::SeqT seq{0};
-int shared{0};
-std::thread* writer{nullptr};
-std::atomic_flag writer_done{};
-
 static void BM_SeqLockReference(benchmark::State& state) {
     int from{0};
     int to{0};
@@ -24,10 +19,15 @@ static void BM_SeqLockReference(benchmark::State& state) {
     }
 }
 
+SeqLock lock{};
+int shared{0};
+std::thread* writer{nullptr};
+std::atomic_flag writer_done{};
+
 static void BM_SeqLockSingleWriter(benchmark::State& state) {
     if (state.thread_index() == 0) {
         benchmark::DoNotOptimize(shared);
-        benchmark::DoNotOptimize(seq);
+        benchmark::DoNotOptimize(lock);
         benchmark::DoNotOptimize(writer);
         benchmark::DoNotOptimize(writer_done);
 
@@ -35,7 +35,7 @@ static void BM_SeqLockSingleWriter(benchmark::State& state) {
 
         writer = new std::thread{[&] {
             if (not writer_done.test(std::memory_order_relaxed)) {
-                SeqLock::StoreSingle(seq, [&] { shared++; });
+                lock.StoreSingle([&] { shared++; });
             }
         }};
     }
@@ -43,7 +43,7 @@ static void BM_SeqLockSingleWriter(benchmark::State& state) {
     int shared_copy{0};
     benchmark::DoNotOptimize(shared_copy);
     for (auto _ : state) {
-        SeqLock::TryLoad(seq, [&] { shared_copy = shared; });
+        lock.TryLoad([&] { shared_copy = shared; });
     }
 
     if (state.thread_index() == 0) {
