@@ -35,6 +35,10 @@ class SeqLock {
     SeqLock(SeqLock&&) = delete;
     SeqLock& operator=(SeqLock&&) = delete;
 
+    /// `Sequence` returns the current sequence number. The returned sequence number is guaranteed to be even if this
+    /// function is not called in the `store_fn` function in `StoreSingle` or `StoreMulti`.
+    SeqT Sequence() const noexcept { return seq_.load(std::memory_order_relaxed); }
+
     /// `StoreSingle` executes `store_fn`, a function meant to update the shared memory synchronized through this lock.
     /// This function should only be used in the case of a single writer. If multiple writers must store data during the
     /// call of `store_fn` to the shared memory synchronized through the `SeqLock`, then use `StoreMulti`. It is
