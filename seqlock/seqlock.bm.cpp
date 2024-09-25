@@ -43,7 +43,7 @@ static void BM_SeqLockSingleWriter(benchmark::State& state) {
     int shared_copy{0};
     benchmark::DoNotOptimize(shared_copy);
     for (auto _ : state) {
-        SeqLock::Load(seq, [&] { shared_copy = shared; });
+        SeqLock::TryLoad(seq, [&] { shared_copy = shared; });
     }
 
     if (state.thread_index() == 0) {

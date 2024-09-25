@@ -18,7 +18,7 @@ TEST(SeqLock, SingleThread) {
     memset(buf, 0, kBufferSize);
 
     SeqLock::StoreSingle(seq, [&] { memset(buf, 1, kBufferSize); });
-    SeqLock::Load(seq, [&] {
+    SeqLock::TryLoad(seq, [&] {
         for (size_t i = 0; i < kBufferSize; i++) {
             ASSERT_EQ(buf[i], 1);
         }
@@ -45,7 +45,7 @@ class Reader {
         int successful = 0;
         int failed = 0;
         while (successful < 100) {
-            bool success = SeqLock::Load(seq_, [&] { memcpy(last_, buf_, kBufferSize); });
+            bool success = SeqLock::TryLoad(seq_, [&] { memcpy(last_, buf_, kBufferSize); });
             if (success) {
                 for (size_t i = 0; i < kBufferSize - 1; i++) {
                     ASSERT_EQ(last_[i], last_[i + 1]);
