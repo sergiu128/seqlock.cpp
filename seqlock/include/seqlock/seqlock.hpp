@@ -76,7 +76,7 @@ class SeqLock {
 
     /// `Load` is like `TryLoad` but returns only when `load_fn` executes successfully.
     template <typename LoadFnT>
-    void Load(const SeqT& seq, LoadFnT&& load_fn) noexcept {
+    void Load(const SeqT& seq, LoadFnT&& load_fn) const noexcept {
         while (not TryLoad(seq, std::forward<LoadFnT>(load_fn))) {
         }
     }
