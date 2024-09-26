@@ -3,6 +3,8 @@
 #include <atomic>
 #include <cstdint>
 
+#include "seqlock/spinlock.hpp"
+
 #if defined(__x86_64__) || defined(_M_X64)
 #define BARRIER asm volatile("" : : : "memory")
 #elif defined(__aarch64__) || defined(_M_ARM64)
@@ -39,6 +41,17 @@ class SeqLock {
     /// function is not called in the `store_fn` function in `StoreSingle` or `StoreMulti`.
     SeqT Sequence() const noexcept { return seq_.load(std::memory_order_relaxed); }
 
+    /// `WriteInProgress` returns true if there's a write in progress. This is equivalent to checking if the sequence
+    /// number is odd.
+    ///
+    /// Use with care. Note that when there are multiple concurrent writers, the write might complete by the time this
+    /// function returns true.
+    bool WriteInProgress() const noexcept { return (seq_.load(std::memory_order_relaxed) & 1) != 0; }
+
+    /// `WriterStalled` returns true if at least one writer is stalled from a set of writers updating the shared memory
+    /// with `StoreMulti` or `TryStoreMulti`.
+    bool WriterStalled() const noexcept { return writer_lock_.IsAcquired(); }
+
     /// `StoreSingle` executes `store_fn`, a function meant to update the shared memory synchronized through this lock.
     /// This function should only be used in the case of a single writer. If multiple writers must store data during the
     /// call of `store_fn` to the shared memory synchronized through the `SeqLock`, then use `StoreMulti`. It is
@@ -54,6 +67,34 @@ class SeqLock {
         BARRIER;
         store_fn();
         seq_.store(seq_init + 2, std::memory_order::release);
+    }
+
+    /// `StoreMulti` executes `store_fn`, a function meant to update the shared memory synchronized through this lock.
+    /// This function should only be used in the case of multiple writers. The writer that calls `StoreMulti` might be
+    /// starved by another writer whose write is currently in progress. To have control over this starvation, look at
+    /// `TryStoreMulti`.
+    ///
+    /// Callers must ensure `store_fn` only stores to and does load anything from the shared memory that's synchronized
+    /// through the `SeqLock`.
+    template <typename StoreFnT>
+    void StoreMulti(StoreFnT&& store_fn) noexcept {
+        writer_lock_([&] { StoreSingle(std::forward<StoreFnT>(store_fn)); });
+    }
+
+    /// `TryStoreMulti` tries to execute `store_fn`, a function meant to update the shared memory synchronized through
+    /// this lock. This function should only be used in the case of multiple writers. This function returns false if
+    /// there is already a write in progress. Otherwise, `store_fn` is executed and true is returned.
+    ///
+    /// Callers must ensure `store_fn` only stores to and does load anything from the shared memory that's synchronized
+    /// through the `SeqLock`.
+    template <typename StoreFnT>
+    bool TryStoreMulti(StoreFnT&& store_fn) noexcept {
+        if (writer_lock_.TryAcquire()) {
+            StoreSingle(std::forward<StoreFnT>(store_fn));
+            writer_lock_.Release();
+            return true;
+        }
+        return false;
     }
 
     /// `TryLoad` tries to execute the provided `load_fn`, a function meant to read from the shared memory synchronized
@@ -83,6 +124,9 @@ class SeqLock {
 
    private:
     SeqT seq_{0};
+
+    // It is guaranteed that `seq_` is even when this lock is not held.
+    SpinLock writer_lock_{};
 };
 
 }  // namespace seqlock
