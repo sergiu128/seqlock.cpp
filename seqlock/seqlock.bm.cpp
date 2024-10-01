@@ -19,7 +19,7 @@ static void BM_SeqLockReference(benchmark::State& state) {
     }
 }
 
-SeqLock lock{};
+SeqLock<seqlock::mode::SingleWriter> lock{};
 int shared{0};
 std::thread* writer{nullptr};
 std::atomic_flag writer_done{};
@@ -35,7 +35,7 @@ static void BM_SeqLockSingleWriter(benchmark::State& state) {
 
         writer = new std::thread{[&] {
             if (not writer_done.test(std::memory_order_relaxed)) {
-                lock.StoreSingle([&] { shared++; });
+                lock.Store([&] { shared++; });
             }
         }};
     }
