@@ -25,9 +25,10 @@ namespace seqlock {
 /// Callers are expected to use only one of the two write functions to update the shared memory in a synchronized
 /// manner: either `StoreSingle` for single-writer workflows or `StoreMulti` for multi-writer workflows.
 class SeqLock {
-   public:
+   private:
     using SeqT = std::atomic<uint64_t>;
 
+   public:
     SeqLock() { static_assert(SeqT::is_always_lock_free, "Sequence number type must be lock-free."); }
     ~SeqLock() = default;
 
