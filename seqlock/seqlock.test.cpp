@@ -39,6 +39,11 @@ TEST(SeqLock, SingleThread) {
             ASSERT_EQ(buf[i], 1);
         }
     });
+    lock.Load([&] {
+        for (size_t i = 0; i < kBufferSize; i++) {
+            ASSERT_EQ(buf[i], 1);
+        }
+    });
     ASSERT_EQ(lock.Sequence(), 2);
 }
 
