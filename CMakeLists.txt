@@ -7,3 +7,4 @@ setup_environment()
 
 add_subdirectory("seqlock")
 add_subdirectory("src")
+add_subdirectory("examples")
