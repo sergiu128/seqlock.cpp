@@ -10,23 +10,20 @@
 #include <vector>
 
 #include "seqlock/spinlock.hpp"
+#include "seqlock/util.hpp"
 
-using seqlock::SeqLock;
-using seqlock::SpinLock;
-using seqlock::mode::Mode;
-using seqlock::mode::MultiWriter;
-using seqlock::mode::SingleWriter;
+using namespace seqlock;  // NOLINT
 
 constexpr size_t kBufferSize = 1024;
 
 TEST(SeqLock, CorrectMode) {
     // basically checking if SFINAE works
-    ASSERT_EQ(sizeof(SeqLock<SingleWriter>), 8);
-    ASSERT_GT(sizeof(SeqLock<MultiWriter>), sizeof(SeqLock<SingleWriter>));
+    ASSERT_EQ(sizeof(SeqLock<mode::SingleWriter>), 8);
+    ASSERT_GT(sizeof(SeqLock<mode::MultiWriter>), sizeof(SeqLock<mode::SingleWriter>));
 }
 
 TEST(SeqLock, SingleThread) {
-    SeqLock<SingleWriter> lock{};
+    SeqLock<mode::SingleWriter> lock{};
     char buf[kBufferSize];
     memset(buf, 0, kBufferSize);
 
@@ -50,7 +47,7 @@ TEST(SeqLock, SingleThread) {
 // Synchronizes calls to std::cout between Readers and Writers, since std::cout is not thread-safe by default.
 static inline std::mutex cout_mutex{};
 
-template <Mode ModeT>
+template <mode::Mode ModeT>
 class Reader {
    public:
     Reader() = delete;
@@ -95,7 +92,7 @@ class Reader {
     char last_[kBufferSize];
 };
 
-template <Mode ModeT>
+template <mode::Mode ModeT>
 class Writer {
    public:
     Writer() = delete;
@@ -109,7 +106,7 @@ class Writer {
     Writer& operator=(Writer&&) = delete;
 
     void Run()
-        requires std::same_as<ModeT, SingleWriter>
+        requires std::same_as<ModeT, mode::SingleWriter>
     {
         cout_mutex.lock();
         std::cout << "writer starting" << std::endl;
@@ -133,7 +130,7 @@ class Writer {
     }
 
     void Run()
-        requires std::same_as<ModeT, MultiWriter>
+        requires std::same_as<ModeT, mode::MultiWriter>
     {
         cout_mutex.lock();
         std::cout << "writer " << id_ << " starting" << std::endl;
@@ -161,28 +158,28 @@ class Writer {
 };
 
 TEST(SeqLock, MultiThreadSingleWriterSingleReader) {
-    SeqLock<SingleWriter> lock{};
+    SeqLock<mode::SingleWriter> lock{};
 
     char buf[kBufferSize];
     memset(buf, 0, kBufferSize);
 
-    Reader<SingleWriter> r{lock, buf, 0};
-    std::thread rt{&Reader<SingleWriter>::Run, &r};
+    Reader<mode::SingleWriter> r{lock, buf, 0};
+    std::thread rt{&Reader<mode::SingleWriter>::Run, &r};
 
-    Writer<SingleWriter> w{lock, buf};
-    std::thread wt{&Writer<SingleWriter>::Run, &w};
+    Writer<mode::SingleWriter> w{lock, buf};
+    std::thread wt{&Writer<mode::SingleWriter>::Run, &w};
 
     rt.join();
     wt.join();
 }
 
 TEST(SeqLock, MultiThreadSingleWriterMultiReader) {
-    SeqLock<SingleWriter> lock{};
+    SeqLock<mode::SingleWriter> lock{};
 
     char buf[kBufferSize];
     memset(buf, 0, kBufferSize);
 
-    std::vector<Reader<SingleWriter>> readers;
+    std::vector<Reader<mode::SingleWriter>> readers;
     std::vector<std::thread> reader_threads;
     constexpr size_t kReaders = 10;
     readers.reserve(kReaders);
@@ -190,11 +187,11 @@ TEST(SeqLock, MultiThreadSingleWriterMultiReader) {
     std::cout << "will spawn " << kReaders << " readers" << std::endl;
     for (size_t i = 0; i < kReaders; i++) {
         readers.emplace_back(lock, buf, i);
-        reader_threads.emplace_back(&Reader<SingleWriter>::Run, &readers.back());
+        reader_threads.emplace_back(&Reader<mode::SingleWriter>::Run, &readers.back());
     }
 
-    Writer<SingleWriter> w{lock, buf};
-    std::thread wt{&Writer<SingleWriter>::Run, &w};
+    Writer<mode::SingleWriter> w{lock, buf};
+    std::thread wt{&Writer<mode::SingleWriter>::Run, &w};
 
     for (auto& rt : reader_threads) {
         rt.join();
@@ -203,12 +200,12 @@ TEST(SeqLock, MultiThreadSingleWriterMultiReader) {
 }
 
 TEST(SeqLock, MultiThreadMultiWriterMultiReader) {
-    SeqLock<MultiWriter> lock{};
+    SeqLock<mode::MultiWriter> lock{};
 
     char buf[kBufferSize];
     memset(buf, 0, kBufferSize);
 
-    std::vector<Reader<MultiWriter>> readers;
+    std::vector<Reader<mode::MultiWriter>> readers;
     std::vector<std::thread> reader_threads;
     constexpr size_t kReaders = 10;
     readers.reserve(kReaders);
@@ -216,10 +213,10 @@ TEST(SeqLock, MultiThreadMultiWriterMultiReader) {
     std::cout << "will spawn " << kReaders << " readers" << std::endl;
     for (size_t i = 0; i < kReaders; i++) {
         readers.emplace_back(lock, buf, i);
-        reader_threads.emplace_back(&Reader<MultiWriter>::Run, &readers.back());
+        reader_threads.emplace_back(&Reader<mode::MultiWriter>::Run, &readers.back());
     }
 
-    std::vector<Writer<MultiWriter>> writers;
+    std::vector<Writer<mode::MultiWriter>> writers;
     std::vector<std::thread> writer_threads;
     constexpr size_t kWriters = 10;
     writers.reserve(kWriters);
@@ -227,7 +224,7 @@ TEST(SeqLock, MultiThreadMultiWriterMultiReader) {
     std::cout << "will spawn " << kWriters << " writers" << std::endl;
     for (size_t i = 0; i < kWriters; i++) {
         writers.emplace_back(lock, buf, i);
-        writer_threads.emplace_back(&Writer<MultiWriter>::Run, &writers.back());
+        writer_threads.emplace_back(&Writer<mode::MultiWriter>::Run, &writers.back());
     }
 
     for (auto& rt : reader_threads) {
@@ -241,7 +238,7 @@ TEST(SeqLock, MultiThreadMultiWriterMultiReader) {
 TEST(SeqLock, TwoWritersTryStore) {
     constexpr int kIterations = 10;
     for (int i = 0; i < kIterations; i++) {
-        SeqLock<MultiWriter> lock{};
+        SeqLock<mode::MultiWriter> lock{};
 
         char buf[kBufferSize];
         memset(buf, 0, kBufferSize);
@@ -305,4 +302,51 @@ TEST(SeqLock, TwoWritersTryStore) {
             std::cout << "writer 2 successful=" << successful[1] << " failed=" << failed[1] << std::endl;
         }
     }
+}
+
+TEST(SeqLock, Shm) {
+    using namespace std::chrono_literals;
+
+    std::atomic<int> writer_state{0};  // 0: preparing 1: writing 2: done
+
+    std::thread writer{[&] {
+        util::SharedMemory shm{"/sharedfile", 128};
+        auto* region = util::Region<mode::SingleWriter, 128>::Create(shm);
+
+        writer_state = 1;
+
+        for (int i = 0; i < 1'000; i++) {
+            char from[64];
+            memset(from, i & 127, sizeof(from));
+            region->Store(from, 64);
+            std::this_thread::sleep_for(1ms);
+        }
+
+        writer_state = 2;
+    }};
+
+    std::thread reader{[&] {
+        while (writer_state == 0) {
+        }
+
+        util::SharedMemory shm{"/sharedfile", 128};
+        auto* region = util::Region<mode::SingleWriter, 128>::Create(shm);
+        bool ok = false;
+        while (writer_state == 1) {
+            char into[64];
+            memset(into, 0, 64);
+            region->Load(into, 64);
+            for (int i = 0; i < 63; i++) {
+                if (into[i] > 0) {
+                    ASSERT_EQ(into[i], into[i + 1]);
+                    ok = true;
+                }
+            }
+            std::this_thread::sleep_for(2ms);
+        }
+        ASSERT_TRUE(ok);
+    }};
+
+    writer.join();
+    reader.join();
 }
