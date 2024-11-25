@@ -9,7 +9,9 @@
 #include <chrono>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <sstream>
+#include <stdexcept>
 #include <system_error>
 #include <thread>
 
@@ -28,7 +30,7 @@ void SharedMemory::Create(const std::string& filename, size_t size) {
         throw std::runtime_error{"File name must be between (0, 255] characters."};
     }
     if (not filename.starts_with("/")) {
-        throw std::runtime_error{"File name must start with /"};
+        throw std::runtime_error{"File name must start with /."};
     }
     filename_ = filename;
 
@@ -107,7 +109,7 @@ void SharedMemory::CloseNoExcept() noexcept {
 size_t GetFileSize(int fd) {
     struct stat st;
     if (::fstat(fd, &st) != 0) {
-        throw std::runtime_error{"Could not fstat file"};
+        throw std::runtime_error{"Could not fstat file."};
     }
     return st.st_size;
 }
@@ -119,7 +121,12 @@ size_t RoundToPageSize(size_t size) {
     if (size == 0) {
         return page_size;
     }
+
     if (const auto remainder = size % page_size; remainder > 0) {
+        if (size > std::numeric_limits<size_t>::max() - (page_size - remainder)) {
+            throw std::runtime_error{"Size exceeds allowable limits when rounded to page size."};
+        }
+
         size += page_size - remainder;
     }
     return size;
