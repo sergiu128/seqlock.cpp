@@ -6,5 +6,5 @@ include("cmake/setup_environment.cmake")
 setup_environment()
 
 add_subdirectory("seqlock")
-add_subdirectory("src")
+add_subdirectory("tests")
 add_subdirectory("examples")
