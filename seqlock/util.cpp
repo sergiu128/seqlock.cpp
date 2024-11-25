@@ -8,6 +8,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -23,6 +24,9 @@ void SharedMemory::Create(const std::string& filename, size_t size) {
     }
     if (not filename.starts_with("/")) {
         throw std::runtime_error{"File name must start with /."};
+    }
+    if (std::filesystem::exists(filename)) {
+        throw std::runtime_error{"File name exists."};
     }
     filename_ = filename;
 
