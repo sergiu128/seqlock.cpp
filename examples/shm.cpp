@@ -51,7 +51,8 @@ int main() {  // NOLINT
     using namespace std::chrono_literals;
 
     std::thread writer{[&] {
-        util::SharedMemory shm{filename, filesize};
+        util::SharedMemory shm{filename, filesize,
+                               [](const std::exception& e) { std::cerr << "writer error: " << e.what() << std::endl; }};
         auto* region = shm.Map<Region>();
         writer_state = 1;
 
@@ -70,7 +71,8 @@ int main() {  // NOLINT
         }
 
         // Writer initialized, we can now access the shared memory.
-        util::SharedMemory shm{filename, filesize};
+        util::SharedMemory shm{filename, filesize,
+                               [](const std::exception& e) { std::cerr << "reader error: " << e.what() << std::endl; }};
         auto* region = shm.Map<Region>();
 
         bool mask[128];

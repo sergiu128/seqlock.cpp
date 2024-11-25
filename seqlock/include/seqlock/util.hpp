@@ -4,6 +4,7 @@
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <utility>
 
 #include "seqlock.hpp"
 
@@ -16,9 +17,12 @@ class SharedMemory {
     void Create(const std::string& filename, size_t size);
 
    public:
+    using ErrorHandler = std::function<void(const std::exception&)>;
+
     SharedMemory() = delete;
-    explicit SharedMemory(size_t size);
-    explicit SharedMemory(const std::string& filename, size_t size);
+    explicit SharedMemory(ErrorHandler);
+    explicit SharedMemory(size_t, ErrorHandler);
+    explicit SharedMemory(const std::string&, size_t, ErrorHandler);
     ~SharedMemory() noexcept;
 
     // Copy.
@@ -54,13 +58,13 @@ class SharedMemory {
     }
 
    private:
+    ErrorHandler on_error_;
     std::string filename_;
     size_t size_;
     void* ptr_{nullptr};
     std::atomic<bool> is_creator_{};
 
     void CloseNoExcept() noexcept;
-    static void CloseFd(int fd) noexcept;
 };
 
 size_t GetFileSize(int fd);

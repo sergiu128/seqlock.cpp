@@ -40,7 +40,8 @@ struct SingleWriterSeqLock* seqlock_single_writer_create_shared(const char* file
 
         const size_t seqlock_size = sizeof(seqlock::SeqLock<seqlock::mode::SingleWriter>);
         size += seqlock_size;
-        auto* shm = new seqlock::util::SharedMemory{filename, size};
+        auto* shm = new seqlock::util::SharedMemory{
+            filename, size, [](const std::exception& e) { std::cerr << e.what() << std::endl; }};
         auto* lock = shm->Map<seqlock::SeqLock<seqlock::mode::SingleWriter>>();
 
         wrapper_lock->lock = lock;

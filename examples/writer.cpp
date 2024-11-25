@@ -13,7 +13,7 @@ int main() {  // NOLINT
     const char* filename = "/shmfiletest42";
     const size_t filesize = util::GetPageSize();
 
-    util::SharedMemory shm{filename, filesize};
+    util::SharedMemory shm{filename, filesize, [](const std::exception&) {}};
     auto* region = util::Region<mode::SingleWriter, 4096>::Create(shm);
 
     std::atomic<int> writer_state{0};  // 0: preparing 1: working 2: done
