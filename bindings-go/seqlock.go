@@ -1,9 +1,9 @@
 package seqlock
 
-// #cgo CXXFLAGS: -std=c++20 -I/Users/sergiu/Code/my-projects/seqlock.cpp/deps_install/include
-// #cgo LDFLAGS: /Users/sergiu/Code/my-projects/seqlock.cpp/deps_install/lib/libseqlock.a -lstdc++
+// #cgo CXXFLAGS: -std=c++23
+// #cgo LDFLAGS: ${SRCDIR}/libseqlock.a -lstdc++
 // #include <stdlib.h>
-// #include "/Users/sergiu/Code/my-projects/seqlock.cpp/deps_install/include/seqlock/ffi.h"
+// #include "ffi.h"
 import "C"
 
 import (
