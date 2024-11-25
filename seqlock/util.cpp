@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -20,19 +21,19 @@ namespace seqlock::util {
 
 void SharedMemory::Create(std::string_view filename, size_t size) {
     if (filename.empty() or filename.size() > NAME_MAX) {
-        throw std::runtime_error{"File name must be between (0, 255] characters."};
+        throw std::runtime_error{std::format("File name {} must be between (0, 255] characters.", filename)};
     }
     if (not filename.starts_with("/")) {
-        throw std::runtime_error{"File name must start with /."};
+        throw std::runtime_error{std::format("File name {} must start with /.", filename)};
     }
     if (std::filesystem::exists(filename)) {
-        throw std::runtime_error{"File name exists."};
+        throw std::runtime_error{std::format("File name {} exists.", filename)};
     }
     filename_ = filename;
 
     size_ = RoundToPageSize(size);
     if (size == 0) {
-        throw std::runtime_error{"Size cannot be 0"};
+        throw std::runtime_error{std::format("Size cannot be 0: ", size)};
     }
 
     auto close_fd = [](int fd) {
@@ -59,10 +60,10 @@ void SharedMemory::Create(std::string_view filename, size_t size) {
             throw std::system_error{errno, std::generic_category(), "shm_open"};
         }
 
-        if (GetFileSize(fd) != size_) {
+        if (const auto actual = GetFileSize(fd); actual != size_) {
             close_fd(fd);
             CloseNoExcept();
-            throw std::runtime_error{"size mismatch"};
+            throw std::runtime_error{std::format("size mismatch actual = {} != {} = expected", actual, size_)};
         }
 
         is_creator_ = false;
@@ -140,7 +141,7 @@ size_t RoundToPageSize(size_t size) {
 
     if (const auto remainder = size % page_size; remainder > 0) {
         if (size > std::numeric_limits<size_t>::max() - (page_size - remainder)) {
-            throw std::runtime_error{"Size exceeds allowable limits when rounded to page size."};
+            throw std::runtime_error{std::format("Size {} exceeds allowable limits when rounded to page size.", size)};
         }
 
         size += page_size - remainder;
