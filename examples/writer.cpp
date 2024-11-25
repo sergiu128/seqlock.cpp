@@ -31,8 +31,7 @@ int main() {  // NOLINT
         writer_state = 2;
     }};
 
-    std::atomic_flag ok{};
-    ok.clear();
+    std::atomic<bool> ok{false};
     std::thread reader{[&] {
         while (writer_state == 0) {
             std::this_thread::sleep_for(10ms);
@@ -43,7 +42,7 @@ int main() {  // NOLINT
         while (writer_state == 1) {
             region->Load(to, 4096);
             if (to[0] > 0) {
-                ok.test_and_set();
+                ok = true;
                 for (int i = 0; i < 4095; i++) {
                     if (to[i] != to[i + 1]) {
                         std::cout << "invalid load" << std::endl;
@@ -57,7 +56,7 @@ int main() {  // NOLINT
     writer.join();
     reader.join();
 
-    if (not ok.test()) {
+    if (not ok) {
         std::cout << "invalid load" << std::endl;
         return EXIT_FAILURE;
     }

@@ -23,11 +23,11 @@ TEST(FFI, SingleWriter) {
 
     bool mask[128];
     memset(mask, 0, 128);
-    std::atomic_flag writer_done{};
+    std::atomic<bool> writer_done{false};
 
     std::thread reader{[&] {
         char reader_data[kBufferSize];
-        while (not writer_done.test()) {
+        while (not writer_done) {
             seqlock_single_writer_load(lock, reader_data, kBufferSize);
             for (size_t i = 0; i < kBufferSize - 1; i++) {
                 ASSERT_EQ(reader_data[i], reader_data[i + 1]);
@@ -43,7 +43,7 @@ TEST(FFI, SingleWriter) {
             seqlock_single_writer_store(lock, writer_data, kBufferSize);
             std::this_thread::sleep_for(10ms);
         }
-        writer_done.test_and_set();
+        writer_done = true;
     }};
 
     reader.join();
@@ -70,8 +70,7 @@ TEST(FFI, SingleWriterSharedSize) {
 
 TEST(FFI, SingleWriterShared) {
     std::atomic<int> writer_state = 0;  // 0: preparing 1: storing 2: done
-    std::atomic_flag reader_done;
-    reader_done.clear();
+    std::atomic<bool> reader_done = false;
 
     std::thread reader{[&] {
         while (writer_state == 0) {
@@ -103,7 +102,7 @@ TEST(FFI, SingleWriterShared) {
         delete[] buf;
         seqlock_single_writer_destroy(lock);
 
-        reader_done.test_and_set();
+        reader_done = true;
     }};
 
     std::thread writer{[&] {
@@ -123,7 +122,7 @@ TEST(FFI, SingleWriterShared) {
 
         writer_state = 2;
 
-        while (not reader_done.test()) {
+        while (not reader_done) {
         }
 
         delete[] buf;

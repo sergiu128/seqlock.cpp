@@ -249,8 +249,8 @@ TEST(SeqLock, TwoWritersTryStore) {
 
         constexpr int kSuccess = 1000;
 
-        std::atomic_flag w1_done{false};
-        std::atomic_flag w2_done{false};
+        std::atomic<bool> w1_done{false};
+        std::atomic<bool> w2_done{false};
 
         int successful[2];
         int failed[2];
@@ -264,14 +264,14 @@ TEST(SeqLock, TwoWritersTryStore) {
                 }
                 failed[0]++;
 
-                if (w2_done.test()) {
+                if (w2_done) {
                     ASSERT_FALSE(lock.WriterStalled());
                 }
             }
 
             ASSERT_GT(failed[0], 0);
 
-            w1_done.test_and_set();
+            w1_done = true;
         }};
 
         std::thread w2t{[&] {
@@ -281,14 +281,14 @@ TEST(SeqLock, TwoWritersTryStore) {
                 }
                 failed[1]++;
 
-                if (w1_done.test()) {
+                if (w1_done) {
                     ASSERT_FALSE(lock.WriterStalled());
                 }
             }
 
             ASSERT_GT(failed[1], 0);
 
-            w2_done.test_and_set();
+            w2_done = true;
         }};
 
         w1t.join();
