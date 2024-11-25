@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include <chrono>
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include <system_error>
@@ -14,40 +15,46 @@
 
 namespace seqlock::util {
 
-void SharedMemory::Create(const std::string& filename, size_t size) {
-    filename_ = filename;
-    size_ = RoundToPageSize(size);
+void SharedMemory::CloseFd(int fd) noexcept {
+    if (fd >= 0) {
+        if (::close(fd) != 0) {
+            std::cerr << "could not close file descriptor, error: " << std::strerror(errno) << std::endl;
+        }
+    }
+}
 
+void SharedMemory::Create(const std::string& filename, size_t size) {
+    if (filename.empty() or filename.size() > NAME_MAX) {
+        throw std::runtime_error{"File name must be between (0, 255] characters."};
+    }
+    if (not filename.starts_with("/")) {
+        throw std::runtime_error{"File name must start with /"};
+    }
+    filename_ = filename;
+
+    size_ = RoundToPageSize(size);
     if (size == 0) {
         throw std::runtime_error{"Size cannot be 0"};
     }
 
-    const char* filename_cstr = filename_.c_str();
-
-    if (const auto filename_size = strlen(filename_cstr); filename_size < 0 or filename_size > NAME_MAX) {
-        throw std::runtime_error{"File name must be between (0, 255] characters."};
-    }
-
-    if (filename[0] != '/') {
-        throw std::runtime_error{"File name must start with /"};
-    }
-
-    fd_ = shm_open(filename_cstr, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-    if (fd_ >= 0) {
-        if (ftruncate(fd_, static_cast<off_t>(size)) != 0) {
+    int fd = ::shm_open(filename_.c_str(), O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+    if (fd >= 0) {
+        if (::ftruncate(fd, static_cast<off_t>(size)) != 0) {
+            CloseFd(fd);
             CloseNoExcept();
             throw std::system_error{errno, std::generic_category(), "ftruncate"};
         }
         is_creator_ = true;
     } else if (errno == EEXIST) {
         errno = 0;
-        fd_ = shm_open(filename_cstr, O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-        if (fd_ < 0) {
+        fd = ::shm_open(filename_.c_str(), O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+        if (fd < 0) {
             CloseNoExcept();
             throw std::system_error{errno, std::generic_category(), "shm_open"};
         }
 
-        if (GetFileSize(fd_) != size_) {
+        if (GetFileSize(fd) != size_) {
+            CloseFd(fd);
             CloseNoExcept();
             throw std::runtime_error{"size mismatch"};
         }
@@ -58,7 +65,8 @@ void SharedMemory::Create(const std::string& filename, size_t size) {
         throw std::system_error{errno, std::generic_category(), "shm_open"};
     }
 
-    ptr_ = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd_, 0);
+    ptr_ = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    CloseFd(fd);
     if (ptr_ == MAP_FAILED) {
         CloseNoExcept();
         throw std::system_error{errno, std::generic_category(), "mmap"};
@@ -78,16 +86,11 @@ SharedMemory::SharedMemory(size_t size) {
 SharedMemory::SharedMemory(const std::string& filename, size_t size) { Create(filename, size); }
 
 void SharedMemory::Close() {
-    if (fd_ >= 0) {
-        if (is_creator_) {
-            shm_unlink(filename_.c_str());
-        }
-        if (ptr_ != nullptr) {
-            munmap(ptr_, size_);
-        }
-        close(fd_);
-
-        fd_ = -1;
+    if (is_creator_) {
+        ::shm_unlink(filename_.c_str());
+    }
+    if (ptr_ != nullptr) {
+        ::munmap(ptr_, size_);
         ptr_ = nullptr;
     }
 }
@@ -103,13 +106,13 @@ void SharedMemory::CloseNoExcept() noexcept {
 
 size_t GetFileSize(int fd) {
     struct stat st;
-    if (fstat(fd, &st) != 0) {
+    if (::fstat(fd, &st) != 0) {
         throw std::runtime_error{"Could not fstat file"};
     }
     return st.st_size;
 }
 
-size_t GetPageSize() { return sysconf(_SC_PAGESIZE); }
+size_t GetPageSize() { return ::sysconf(_SC_PAGESIZE); }
 
 size_t RoundToPageSize(size_t size) {
     const auto page_size = GetPageSize();

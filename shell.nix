@@ -1,9 +1,3 @@
-# install nix with: 
-#
-# $ curl -L https://nixos.org/nix/install | sh -s -- --daemon
-#
-# then run nix-shell at which point you can run ./setup.sh
-
 let
   nixpkgs = fetchTarball "https://github.com/NixOS/nixpkgs/tarball/nixos-24.05";
   pkgs = import nixpkgs { config = {}; overlays = []; };

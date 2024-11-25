@@ -8,6 +8,8 @@
 
 namespace seqlock::util {
 
+// Creates an memory maps a file in shared memory through `shm_open`. The creator of the file (indicated through
+// `SharedMemory::IsCreator()`) is responsible for unlinking it at destruction time.
 class SharedMemory {
    private:
     void Create(const std::string& filename, size_t size);
@@ -29,13 +31,16 @@ class SharedMemory {
     void* Ptr() const noexcept { return ptr_; }
     size_t Size() const noexcept { return size_; }
     const std::string& Filename() const noexcept { return filename_; }
+    bool IsCreator() const noexcept { return is_creator_; }
 
     void Close();
 
+    // Constructs the given type with the given arguments in-place in the shared memory. Callers must not `delete` the
+    // returned pointer.
     template <typename T, typename... Args>
     T* Map(Args... args) const {
         if (ptr_ == nullptr) {
-            throw std::runtime_error("Cannot create in unitialized memory");
+            throw std::runtime_error{"Cannot create in unitialized memory"};
         }
 
         T* obj{nullptr};
@@ -50,11 +55,11 @@ class SharedMemory {
    private:
     std::string filename_;
     size_t size_;
-    int fd_{-1};
     void* ptr_{nullptr};
     bool is_creator_{false};
 
     void CloseNoExcept() noexcept;
+    static void CloseFd(int fd) noexcept;
 };
 
 size_t GetFileSize(int fd);
