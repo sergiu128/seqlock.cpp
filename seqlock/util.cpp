@@ -18,7 +18,7 @@
 
 namespace seqlock::util {
 
-void SharedMemory::Create(const std::string& filename, size_t size) {
+void SharedMemory::Create(std::string_view filename, size_t size) {
     if (filename.empty() or filename.size() > NAME_MAX) {
         throw std::runtime_error{"File name must be between (0, 255] characters."};
     }
@@ -91,7 +91,7 @@ SharedMemory::SharedMemory(size_t size, ErrorHandler on_error) : SharedMemory{st
     Create(oss.str(), size);
 }
 
-SharedMemory::SharedMemory(const std::string& filename, size_t size, ErrorHandler on_error)
+SharedMemory::SharedMemory(std::string_view filename, size_t size, ErrorHandler on_error)
     : SharedMemory{std::move(on_error)} {
     Create(filename, size);
 }

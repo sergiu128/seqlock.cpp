@@ -14,7 +14,7 @@ namespace seqlock::util {
 // `SharedMemory::IsCreator()`) is responsible for unlinking it at destruction time.
 class SharedMemory {
    private:
-    void Create(const std::string& filename, size_t size);
+    void Create(std::string_view filename, size_t size);
 
    public:
     using ErrorHandler = std::function<void(const std::exception&)>;
@@ -22,7 +22,7 @@ class SharedMemory {
     SharedMemory() = delete;
     explicit SharedMemory(ErrorHandler);
     explicit SharedMemory(size_t, ErrorHandler);
-    explicit SharedMemory(const std::string&, size_t, ErrorHandler);
+    explicit SharedMemory(std::string_view, size_t, ErrorHandler);
     ~SharedMemory() noexcept;
 
     // Copy.
@@ -35,7 +35,7 @@ class SharedMemory {
 
     void* Ptr() const noexcept { return ptr_; }
     size_t Size() const noexcept { return size_; }
-    const std::string& Filename() const noexcept { return filename_; }
+    std::string_view Filename() const noexcept { return filename_; }
     bool IsCreator() const noexcept { return is_creator_; }
 
     void Close();
