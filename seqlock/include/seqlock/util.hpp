@@ -2,16 +2,15 @@
 
 #include <atomic>
 #include <cstring>
-#include <iostream>
+#include <functional>
 #include <stdexcept>
-#include <utility>
 
 #include "seqlock.hpp"
 
 namespace seqlock::util {
 
-// Creates an memory maps a file in shared memory through `shm_open`. The creator of the file (indicated through
-// `SharedMemory::IsCreator()`) is responsible for unlinking it at destruction time.
+/// Creates an memory maps a file in shared memory through `shm_open`. The creator of the file (indicated through
+/// `SharedMemory::IsCreator()`) is responsible for unlinking it at destruction time.
 class SharedMemory {
    private:
     void Create(std::string_view filename, size_t size);
@@ -40,8 +39,8 @@ class SharedMemory {
 
     void Close();
 
-    // Constructs the given type with the given arguments in-place in the shared memory. Callers must not `delete` the
-    // returned pointer.
+    /// Constructs the given type with the given arguments in-place in the shared memory. Callers must not `delete` the
+    /// returned pointer.
     template <typename T, typename... Args>
     T* Map(Args... args) const {
         if (ptr_ == nullptr) {
@@ -62,7 +61,7 @@ class SharedMemory {
     std::string filename_;
     size_t size_;
     void* ptr_{nullptr};
-    std::atomic<bool> is_creator_{};
+    std::atomic<bool> is_creator_{false};
 
     void CloseNoExcept() noexcept;
 };

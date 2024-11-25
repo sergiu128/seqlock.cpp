@@ -15,7 +15,6 @@
 #include <sstream>
 #include <stdexcept>
 #include <system_error>
-#include <thread>
 
 namespace seqlock::util {
 

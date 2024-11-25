@@ -1,7 +1,6 @@
-#include <algorithm>
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <seqlock/seqlock.hpp>
 #include <seqlock/util.hpp>
 #include <thread>

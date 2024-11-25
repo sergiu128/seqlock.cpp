@@ -9,7 +9,6 @@
 #include <thread>
 #include <vector>
 
-#include "seqlock/spinlock.hpp"
 #include "seqlock/util.hpp"
 
 using namespace seqlock;  // NOLINT

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 #include <seqlock/seqlock.hpp>
 #include <seqlock/util.hpp>
 #include <thread>
