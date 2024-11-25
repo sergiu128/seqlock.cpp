@@ -31,13 +31,10 @@ function(config_compiler)
     else ()
         message(FATAL_ERROR "Invalid build type: ${CMAKE_BUILD_TYPE}")
     endif()
-
-    set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
-    set(CMAKE_CXX_STANDARD 20)
+    
+    add_compile_options(-Wall -Wextra -Wno-c99-extensions -Wno-missing-field-initializers -Werror=format -std=c++23)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-    add_compile_options(-Wall -Wextra -Wno-c99-extensions
-        -Wno-missing-field-initializers -Werror=format -std=c++20)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
 
     message("Configured compiler. Using ${CMAKE_CXX_COMPILER_ID} \
 ${CMAKE_CXX_COMPILER_VERSION}")
