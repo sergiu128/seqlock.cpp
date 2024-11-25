@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -56,7 +57,7 @@ class SharedMemory {
     std::string filename_;
     size_t size_;
     void* ptr_{nullptr};
-    bool is_creator_{false};
+    std::atomic<bool> is_creator_{};
 
     void CloseNoExcept() noexcept;
     static void CloseFd(int fd) noexcept;
