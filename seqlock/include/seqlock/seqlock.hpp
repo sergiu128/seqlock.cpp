@@ -141,7 +141,7 @@ class SeqLock {
     }
 
    private:
-    SeqT seq_{0};
+    alignas(64) SeqT seq_{0};
 
     // Define the `SpinLock` only if in `mode::MultiWriter`. Otherwise, this member variable occupies 0 bytes. It is
     // guaranteed that `seq_` is when this lock is not held.

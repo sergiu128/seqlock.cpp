@@ -41,7 +41,7 @@ class SpinLock {
     }
 
    private:
-    std::atomic_flag acquired_{false};
+    alignas(64) std::atomic_flag acquired_{false};
 };
 
 }  // namespace seqlock
