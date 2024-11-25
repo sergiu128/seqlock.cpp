@@ -7,7 +7,7 @@ pkgs.mkShellNoCC {
   packages = with pkgs; [
     gnumake
     zlib
-    clang-tools
+    clang-tools_18
     clang_18
     llvm_18
     cmake
