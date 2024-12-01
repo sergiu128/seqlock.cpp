@@ -3,7 +3,6 @@
 #include <atomic>
 #include <concepts>
 #include <cstdint>
-#include <new>
 #include <type_traits>
 #include <variant>
 

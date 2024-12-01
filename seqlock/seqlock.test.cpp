@@ -17,8 +17,8 @@ constexpr size_t kBufferSize = 1024;
 
 TEST(SeqLock, CorrectMode) {
     // basically checking if SFINAE works
-    ASSERT_EQ(sizeof(SeqLock<mode::SingleWriter>), 8);
-    ASSERT_GT(sizeof(SeqLock<mode::MultiWriter>), sizeof(SeqLock<mode::SingleWriter>));
+    EXPECT_EQ(sizeof(SeqLock<mode::SingleWriter>), 64 /* since it's aligned.. otherwise it would be 8 */);
+    EXPECT_GT(sizeof(SeqLock<mode::MultiWriter>), sizeof(SeqLock<mode::SingleWriter>));
 }
 
 TEST(SeqLock, SingleThread) {
