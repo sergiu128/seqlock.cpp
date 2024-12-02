@@ -20,6 +20,7 @@ struct SingleWriterSeqLock* seqlock_single_writer_create_shared(const char* file
 void seqlock_single_writer_destroy(struct SingleWriterSeqLock*);
 void seqlock_single_writer_load(struct SingleWriterSeqLock* wrapper_lock, char* dst, size_t size);
 void seqlock_single_writer_store(struct SingleWriterSeqLock* wrapper_lock, char* src, size_t size);
+void seqlock_single_writer_assign(struct SingleWriterSeqLock* wrapper_lock, int value);
 
 #ifdef __cplusplus
 }

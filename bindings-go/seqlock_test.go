@@ -87,7 +87,7 @@ func TestSharedSize(t *testing.T) {
 	}
 	defer lock.Destroy()
 
-	if lock.Size() != 2*os.Getpagesize()-8 /* size of single writer seqlock in c++ */ {
+	if lock.Size() != 2*os.Getpagesize()-64 /* size of single writer seqlock in c++ */ {
 		t.Fatalf("invalid size, should be two pages instead of one")
 	}
 }
