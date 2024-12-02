@@ -308,9 +308,14 @@ TEST(SeqLock, Shm) {
 
     std::atomic<int> writer_state{0};  // 0: preparing 1: writing 2: done
 
+    using Region = seqlock::GuardedRegion<seqlock::mode::SingleWriter, 128>;
+
     std::thread writer{[&] {
-        util::SharedMemory shm{"/sharedfile", 128, [](const std::exception& e) { GTEST_FAIL() << e.what(); }};
-        auto* region = util::Region<mode::SingleWriter, 128>::Create(shm);
+        auto shm = util::SharedMemory<Region>::Create("/sharedfile", 128);
+        if (not shm) {
+            GTEST_FAIL() << "writer could not map memory err=" << shm.error();
+        }
+        auto* region = shm->Get();
 
         writer_state = 1;
 
@@ -328,8 +333,12 @@ TEST(SeqLock, Shm) {
         while (writer_state == 0) {
         }
 
-        util::SharedMemory shm{"/sharedfile", 128, [](const std::exception& e) { GTEST_FAIL() << e.what(); }};
-        auto* region = util::Region<mode::SingleWriter, 128>::Create(shm);
+        auto shm = util::SharedMemory<Region>::Create("/sharedfile", 128);
+        if (not shm) {
+            GTEST_FAIL() << "reader could not map memory err=" << shm.error();
+        }
+        auto* region = shm->Get();
+
         bool ok = false;
         while (writer_state == 1) {
             char into[64];

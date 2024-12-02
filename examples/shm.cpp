@@ -7,39 +7,7 @@
 
 using namespace seqlock;  // NOLINT
 
-/// Region is an object that can be shared between multiple processes. It holds a buffer guarded by a single-writer
-/// sequential lock.
-class Region {
-   public:
-    static constexpr size_t kBufferSize = 1024;
-
-    Region() = default;
-    ~Region() = default;
-
-    // Copy.
-    Region(const Region&) = delete;
-    Region& operator=(const Region&) = delete;
-
-    // Move.
-    Region(Region&&) = delete;
-    Region& operator=(Region&&) = delete;
-
-    void Set(int v) {
-        lock_.Store([&] { std::memset(data_, v, kBufferSize); });
-    }
-
-    void Store(char* from, size_t size) {
-        lock_.Store([&] { std::memcpy(data_, from, std::min(size, kBufferSize)); });
-    }
-
-    void Load(char* into, size_t size) {
-        lock_.Load([&] { std::memcpy(into, data_, std::min(size, kBufferSize)); });
-    }
-
-   private:
-    SeqLock<mode::SingleWriter> lock_;
-    char data_[kBufferSize];
-};
+using Region = seqlock::GuardedRegion<seqlock::mode::SingleWriter, 1024>;
 
 int main() {  // NOLINT
     const char* filename = "/shmfiletest42";
@@ -52,9 +20,15 @@ int main() {  // NOLINT
     using namespace std::chrono_literals;
 
     std::thread writer{[&] {
-        util::SharedMemory shm{filename, filesize,
-                               [](const std::exception& e) { std::cerr << "writer error: " << e.what() << std::endl; }};
-        auto* region = shm.Map<Region>();
+        auto shm = util::SharedMemory<Region>::Create(filename, filesize);
+        if (not shm) {
+            std::cout << "writer could not map memory err=" << shm.error() << std::endl;
+            return;
+        }
+        auto* region = shm->Get();
+
+        std::cout << "writer mapped memory of size " << shm->Size() << std::endl;
+
         writer_state = 1;
 
         for (int i = 0; i < 1'000; i++) {
@@ -64,6 +38,8 @@ int main() {  // NOLINT
         }
 
         writer_state = 2;
+
+        std::cout << "writer done" << std::endl;
     }};
 
     std::thread reader{[&] {
@@ -71,22 +47,26 @@ int main() {  // NOLINT
             std::this_thread::sleep_for(1ms);
         }
 
-        // Writer initialized, we can now access the shared memory.
-        util::SharedMemory shm{filename, filesize,
-                               [](const std::exception& e) { std::cerr << "reader error: " << e.what() << std::endl; }};
-        auto* region = shm.Map<Region>();
+        auto shm = util::SharedMemory<Region>::Create(filename, filesize);
+        if (not shm) {
+            std::cout << "reader could not map memory err=" << shm.error() << std::endl;
+        }
+        auto* region = shm->Get();
+
+        std::cout << "reader mapped memory of size " << shm->Size() << std::endl;
 
         bool mask[128];
         memset(mask, 0, 128);
 
-        char data[Region::kBufferSize];
-        memset(data, 0, Region::kBufferSize);
+        char data[Region::Size()];
+        memset(data, 0, sizeof(data));
 
         while (writer_state == 1) {
-            region->Load(data, Region::kBufferSize);
-            for (size_t i = 0; i < Region::kBufferSize - 1; i++) {
+            region->Load(data, sizeof(data));
+            for (size_t i = 0; i < sizeof(data) - 1; i++) {
                 if (data[i] != data[i + 1]) {
-                    throw std::runtime_error{"invalid shared memory load"};
+                    std::cout << "invalid shared memory load" << std::endl;
+                    return;
                 }
             }
             mask[(size_t)(data[0])] = true;  // NOLINT
@@ -97,8 +77,10 @@ int main() {  // NOLINT
             valid |= mask[i];
         }
         if (not valid) {
-            throw std::runtime_error("no loads happened");
+            std::cout << "no loads happened" << std::endl;
         }
+
+        std::cout << "reader done" << std::endl;
     }};
 
     writer.join();

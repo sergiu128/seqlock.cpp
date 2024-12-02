@@ -1,6 +1,7 @@
 #include "seqlock/ffi.h"
 
 #include <gtest/gtest.h>
+#include <sys/mman.h>
 
 #include <atomic>
 #include <chrono>
@@ -12,6 +13,7 @@
 using namespace std::chrono_literals;
 
 constexpr size_t kBufferSize = 4096;
+const char* kShmFilename = "/test-shared";
 
 TEST(FFI, SingleWriter) {
     char shared_data[kBufferSize];
@@ -59,16 +61,20 @@ TEST(FFI, SingleWriter) {
 }
 
 TEST(FFI, SingleWriterSharedSize) {
+    ::shm_unlink(kShmFilename);
+
     const auto page_size = seqlock::util::GetPageSize();
     ASSERT_GT(page_size, kBufferSize);
 
-    auto* lock = seqlock_single_writer_create_shared("/somethingshared", page_size);
+    auto* lock = seqlock_single_writer_create_shared(kShmFilename, page_size);
     ASSERT_EQ(lock->shared_data_size, page_size * 2 - sizeof(seqlock::SeqLock<seqlock::mode::SingleWriter>));
 
     seqlock_single_writer_destroy(lock);
 }
 
 TEST(FFI, SingleWriterShared) {
+    ::shm_unlink(kShmFilename);
+
     std::atomic<int> writer_state = 0;  // 0: preparing 1: storing 2: done
     std::atomic<bool> reader_done = false;
 
@@ -76,7 +82,9 @@ TEST(FFI, SingleWriterShared) {
         while (writer_state == 0) {
         }
 
-        auto* lock = seqlock_single_writer_create_shared("/yesyesyes2", seqlock::util::GetPageSize());
+        auto* lock = seqlock_single_writer_create_shared(kShmFilename, seqlock::util::GetPageSize());
+        ASSERT_NE(lock, nullptr);
+
         char* buf = new char[lock->shared_data_size];
         memset(buf, 0, lock->shared_data_size);
 
@@ -106,9 +114,13 @@ TEST(FFI, SingleWriterShared) {
     }};
 
     std::thread writer{[&] {
-        auto* lock = seqlock_single_writer_create_shared("/yesyesyes2", seqlock::util::GetPageSize());
+        auto* lock = seqlock_single_writer_create_shared(kShmFilename, seqlock::util::GetPageSize());
+        ASSERT_NE(lock, nullptr);
+
         char* buf = new char[lock->shared_data_size];
         memset(buf, 0, lock->shared_data_size);
+
+        seqlock_single_writer_assign(lock, 0);
 
         writer_state = 1;
 
@@ -117,7 +129,7 @@ TEST(FFI, SingleWriterShared) {
                 buf[j] = i;
             }
             seqlock_single_writer_store(lock, buf, lock->shared_data_size);
-            std::this_thread::sleep_for(std::chrono::milliseconds{10});
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
         }
 
         writer_state = 2;

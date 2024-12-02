@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <concepts>
 #include <cstdint>
@@ -156,6 +157,40 @@ class SeqLock {
         store_fn();
         seq_.store(seq_init + 2, std::memory_order::release);
     }
+};
+
+/// A utility class holding N bytes guarded by a SeqLock of the given mode.
+template <mode::Mode ModeT, size_t N>
+class GuardedRegion {
+   public:
+    GuardedRegion() = default;
+    ~GuardedRegion() = default;
+
+    // Copy.
+    GuardedRegion(const GuardedRegion&) = delete;
+    GuardedRegion& operator=(const GuardedRegion&) = delete;
+
+    // Move.
+    GuardedRegion(GuardedRegion&&) = delete;
+    GuardedRegion& operator=(GuardedRegion&&) = delete;
+
+    void Set(int v) {
+        lock_.Store([&] { std::memset(data_, v, N); });
+    }
+
+    void Store(char* from, size_t size) {
+        lock_.Store([&] { std::memcpy(data_, from, std::min(size, N)); });
+    }
+
+    void Load(char* into, size_t size) {
+        lock_.Load([&] { std::memcpy(into, data_, std::min(size, N)); });
+    }
+
+    static constexpr size_t Size() noexcept { return N; }
+
+   private:
+    SeqLock<ModeT> lock_;
+    char data_[N];
 };
 
 }  // namespace seqlock
