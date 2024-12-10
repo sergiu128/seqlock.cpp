@@ -46,7 +46,7 @@ func main() {
 	}
 }
 
-func runWriter(lck *seqlock.SeqLock) {
+func runWriter(lck *seqlock.SeqLockFFI) {
 	log.Print("running writer")
 
 	var (
@@ -82,7 +82,7 @@ func runWriter(lck *seqlock.SeqLock) {
 	}
 }
 
-func runReader(lck *seqlock.SeqLock) {
+func runReader(lck *seqlock.SeqLockFFI) {
 	log.Print("running reader")
 
 	var (

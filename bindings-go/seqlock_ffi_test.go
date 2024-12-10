@@ -1,7 +1,6 @@
 package seqlock
 
 import (
-	"fmt"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -9,9 +8,9 @@ import (
 	"time"
 )
 
-func TestNotShared(t *testing.T) {
+func TestSeqLockFFI(t *testing.T) {
 	data := make([]byte, 7)
-	lock := NewSeqLock(data)
+	lock := NewSeqLockFFI(data)
 
 	if lock.Size() != 7 {
 		t.Fatal("size should not be changed")
@@ -19,7 +18,7 @@ func TestNotShared(t *testing.T) {
 
 	const Size = 7
 
-	defer lock.Destroy()
+	defer lock.Close()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -80,19 +79,19 @@ func TestNotShared(t *testing.T) {
 	}
 }
 
-func TestSharedSize(t *testing.T) {
-	lock, err := NewSeqLockShared("/somefilenam222", os.Getpagesize())
+func TestSeqLockFFISharedSize(t *testing.T) {
+	lock, err := NewSeqLockFFIShared("/somefilenam222", os.Getpagesize())
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Destroy()
+	defer lock.Close()
 
-	if lock.Size() != 2*os.Getpagesize()-64 /* size of single writer seqlock in c++ */ {
+	if lock.Size() != 2*os.Getpagesize()-seqSize {
 		t.Fatalf("invalid size, should be two pages instead of one")
 	}
 }
 
-func TestShared(t *testing.T) {
+func TestSeqLockFFIShared(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -107,11 +106,11 @@ func TestShared(t *testing.T) {
 		for atomic.LoadInt64(&writerState) == 0 {
 		}
 
-		lock, err := NewSeqLockShared("/yesyesyes", os.Getpagesize())
+		lock, err := NewSeqLockFFIShared("/yesyesyes", os.Getpagesize())
 		if err != nil {
 			panic(err)
 		}
-		defer lock.Destroy()
+		defer lock.Close()
 
 		b := make([]byte, lock.Size())
 		mask := make([]bool, 255)
@@ -146,11 +145,11 @@ func TestShared(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		lock, err := NewSeqLockShared("/yesyesyes", os.Getpagesize())
+		lock, err := NewSeqLockFFIShared("/yesyesyes", os.Getpagesize())
 		if err != nil {
 			panic(err)
 		}
-		defer lock.Destroy()
+		defer lock.Close()
 
 		atomic.StoreInt64(&writerState, 1)
 
@@ -174,30 +173,42 @@ func TestShared(t *testing.T) {
 	wg.Wait()
 }
 
-func BenchmarkFFI(b *testing.B) {
-	sharedData := make([]byte, 8)
-	into := make([]byte, 8)
-
-	lock := NewSeqLock(sharedData)
-	defer lock.Destroy()
-
-	for i := 0; i < b.N; i++ {
-		lock.Load(into)
-		lock.Store(into)
-	}
-}
-
-func BenchmarkFFI2(b *testing.B) {
-	lock, err := NewSeqLockShared("/yesyesyes222", os.Getpagesize())
+func BenchmarkSeqLockFFIStoreLoad(b *testing.B) {
+	lock, err := NewSeqLockFFIShared("/seqlock-ffi-bench", os.Getpagesize())
 	if err != nil {
 		b.Error(err)
 	}
-	defer lock.Destroy()
+	defer lock.Close()
 
 	buf := make([]byte, lock.Size())
-	fmt.Println("storing and loading", lock.Size(), "B")
 	for i := 0; i < b.N; i++ {
 		lock.Store(buf)
+		lock.Load(buf)
+	}
+}
+
+func BenchmarkSeqLockFFIStore(b *testing.B) {
+	lock, err := NewSeqLockFFIShared("/seqlock-ffi-bench", os.Getpagesize())
+	if err != nil {
+		b.Error(err)
+	}
+	defer lock.Close()
+
+	buf := make([]byte, lock.Size())
+	for i := 0; i < b.N; i++ {
+		lock.Store(buf)
+	}
+}
+
+func BenchmarkSeqLockFFILoad(b *testing.B) {
+	lock, err := NewSeqLockFFIShared("/seqlock-ffi-bench", os.Getpagesize())
+	if err != nil {
+		b.Error(err)
+	}
+	defer lock.Close()
+
+	buf := make([]byte, lock.Size())
+	for i := 0; i < b.N; i++ {
 		lock.Load(buf)
 	}
 }

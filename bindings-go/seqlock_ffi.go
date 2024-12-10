@@ -11,29 +11,29 @@ import (
 	"unsafe"
 )
 
-type SeqLock struct {
+type SeqLockFFI struct {
 	ptr    *C.struct_SingleWriterSeqLock
 	size   int
 	data   []byte          // optional
 	pinner *runtime.Pinner // optional
 }
 
-func NewSeqLock(data []byte) *SeqLock {
+func NewSeqLockFFI(data []byte) *SeqLockFFI {
 	ptr := C.seqlock_single_writer_create((*C.char)(unsafe.Pointer(&data[0])), (C.size_t)(len(data)))
 	size := int(ptr.shared_data_size)
 
-	lock := &SeqLock{
+	lock := &SeqLockFFI{
 		ptr:    ptr,
 		size:   size,
 		data:   data,
 		pinner: &runtime.Pinner{},
 	}
-	// Pinning ensures the memory is not moved by the runtime throughout the SeqLock's lifetime, thus making the FFI calls safe.
+	// Pinning ensures the memory is not moved by the runtime throughout the SeqLockFFI's lifetime, thus making the FFI calls safe.
 	lock.pinner.Pin(&data[0])
 	return lock
 }
 
-func NewSeqLockShared(filename string, size int) (*SeqLock, error) {
+func NewSeqLockFFIShared(filename string, size int) (*SeqLockFFI, error) {
 	cStr := C.CString(filename)
 	defer C.free(unsafe.Pointer(cStr))
 
@@ -44,13 +44,13 @@ func NewSeqLockShared(filename string, size int) (*SeqLock, error) {
 
 	size = int(ptr.shared_data_size)
 
-	return &SeqLock{
+	return &SeqLockFFI{
 		ptr:  ptr,
 		size: size,
 	}, nil
 }
 
-func (l *SeqLock) Load(into []byte) error {
+func (l *SeqLockFFI) Load(into []byte) error {
 	addr := (*C.char)(unsafe.Pointer(&into[0]))
 	var pinner runtime.Pinner
 	pinner.Pin(addr)
@@ -60,7 +60,7 @@ func (l *SeqLock) Load(into []byte) error {
 	return err
 }
 
-func (l *SeqLock) Store(from []byte) error {
+func (l *SeqLockFFI) Store(from []byte) error {
 	addr := (*C.char)(unsafe.Pointer(&from[0]))
 	var pinner runtime.Pinner
 	pinner.Pin(addr)
@@ -70,11 +70,11 @@ func (l *SeqLock) Store(from []byte) error {
 	return err
 }
 
-func (l *SeqLock) Size() int {
+func (l *SeqLockFFI) Size() int {
 	return l.size
 }
 
-func (l *SeqLock) Destroy() error {
+func (l *SeqLockFFI) Close() error {
 	if l.pinner != nil {
 		l.pinner.Unpin()
 	}
